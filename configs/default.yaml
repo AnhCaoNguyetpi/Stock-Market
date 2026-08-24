@@ -1,0 +1,23 @@
+data:
+  hose: "Cleaned data/VNINDEX_cleaned.xlsx"
+  hnx: "Cleaned data/HNXINDEX_cleaned.xlsx"
+  upcom: "Cleaned data/UPCOM_cleaned.xlsx"
+  timestamp_column: timestamp
+split:
+  train_end: "2024-12-31"
+  validation_end: "2025-03-31"
+  purge_periods: 10
+labels:
+  horizon: 10
+  risk_quantile: 0.35
+backtest:
+  initial_cash: 1000000000
+  max_positions: 15
+  allocation_per_trade: 0.0666667
+  commission_rate: 0.0015
+  sell_tax_rate: 0.001
+  slippage_rate: 0.001
+  stop_loss: 0.08
+  trailing_stop: 0.07
+  take_profit: 0.20
+  max_holding_days: 20

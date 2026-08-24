@@ -1,80 +1,62 @@
-# Vietnam Stock Market Analysis & Algorithmic Trading System 📈
+# Vietnam Stock Market Research Pipeline
 
-![Python](https://img.shields.io/badge/Python-3.8%2B-blue)
-![Status](https://img.shields.io/badge/Status-Backtesting_Complete-success)
-![Data](https://img.shields.io/badge/Data-FiinQuantX-orange)
+Pipeline nghiên cứu cổ phiếu Việt Nam cho HOSE, HNX và UPCOM. Phiên bản mới ưu tiên
+khả năng tái lập, chia dữ liệu theo thời gian và ngăn data leakage.
 
-## 📖 Overview
+> Đây là phần mềm nghiên cứu, không phải khuyến nghị đầu tư. Kết quả quá khứ không
+> bảo đảm hiệu suất tương lai.
 
-This project aims to develop a comprehensive algorithmic trading system for the stock market in VietNam including (HOSE, HNX, UPCOM). Our system includes intergrating crawling data, cleaning data, exploratory data analysis, feature engineering and Machine Learning and Deep Learning model to find the optimized time to buy/sell stock, manage the risk, apply the bot to backtest in the real market and allow it to send messages to telegram to users to notify the signal.
+## Cài đặt
 
-## 📊 Key Results
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -e .
+Copy-Item .env.example .env
+```
 
-Based on backtesting data from 2025, the strategy significantly demonstrate exceptional capital preservation capabilities and ability to make good decisions.
+Yêu cầu Python 3.10+. Điền credential vào `.env`, không ghi trực tiếp trong code.
+Token và mật khẩu từng được commit phải được thu hồi và cấp lại trước khi sử dụng.
 
-| Metric | Value |
-| :--- | :--- |
-| **Total Return** | **+29.35%** |
-| **Win Rate** | **76.92%** |
+## Chuẩn bị dữ liệu
 
-| **Max Drawdown** | **-4.06%** |
-| **Total Trades** | 52 |
+Đặt `VNINDEX_cleaned.xlsx`, `HNXINDEX_cleaned.xlsx` và `UPCOM_cleaned.xlsx` trong
+`Cleaned data/`. Repository hiện thiếu file VNINDEX đã làm sạch; hãy tạo nó bằng
+notebook làm sạch HOSE hoặc sửa `data.hose` trong `configs/default.yaml`.
 
-<img width="1242" height="626" alt="backtest2025" src="https://github.com/user-attachments/assets/fdb30d85-afce-4460-9435-40ab5dbca288" />
+Các cột tối thiểu: `timestamp`, `ticker`, `open`, `high`, `low`, `close`, `volume`.
+Những feature kỹ thuật dùng để train cũng phải có trong file.
 
-> *Backtest Data: Jan 04, 2022 - Sep 12, 2025.
+## Chạy pipeline
 
-## 🛠️ Methodology
+Sửa mốc thời gian trong `configs/default.yaml` cho phù hợp dữ liệu, sau đó chạy:
 
-The strategy employs a **4-Layer Filtering Strategy** to eliminate noise and select the highest-potential stocks.
+```powershell
+stock-market --config configs/default.yaml train-risk --output artifacts
+pytest -q
+ruff check src tests
+```
 
-> **Note:** The input data was crawled and thoroughly cleaned, and the specific filtering thresholds utilized below were empirically derived through the **Exploratory Data Analysis (EDA)** process.
+Pipeline chỉ train trên tập train, báo cáo validation riêng rồi mới đánh giá test.
 
-### 1. Fundamental Filter
-Filters out stocks with poor financial health based on fundamental indicators:
-* **Criteria:** $EBIT Margin$, $ROA$, $ROE$, $ROIC$.
-* **Thresholds:** Utilizes exchange-specific quantile methods (HOSE, HNX, UPCOM) to ensure alignment with the specific liquidity and scale characteristics of each market.
+## Cấu trúc
 
-### 2. Technical Filter
-Uses Feature Engineering to identify trends and momentum:
-* **RSI:** Flexibly adjusts overbought/oversold thresholds (e.g., HNX uses 25-75, UPCOM uses 20-80).
-* **MACD:** Eliminates noise using standard deviation (std) and quantile methods.
-* **Bollinger Bands:** Uses Bandwidth to assess volatility.
+- `src/stock_market/data.py`: đọc dữ liệu, chuẩn hóa sàn và kiểm tra schema.
+- `src/stock_market/features.py`: feature engineering nhân quả.
+- `src/stock_market/labels.py`: nhãn tương lai riêng cho từng ticker.
+- `src/stock_market/split.py`: chia train/validation/test theo ngày.
+- `src/stock_market/model.py`: LightGBM kèm metadata feature.
+- `src/stock_market/cli.py`: điểm chạy thống nhất.
+- `tests/`: test lỗi xuyên ticker, tên sàn và split.
 
-### 3. Risk Classifier (Machine Learning)
-Deploys a **LightGBM Classifier** model to forecast future drawdown risks.
-* **Objective:** Exclude stocks with high potential for drawdown (worse than the market's 25th percentile).
-* **Performance:** Accuracy across all 3 exchanges achieved > 70%.
+## Nguyên tắc đánh giá
 
-### 4. Signal Classifier (Deep Learning)
-Deploys an **LSTM (Long Short-Term Memory)** model to capture temporal dependencies.
-* **Input:** A sequence of 10 sessions comprising technical indicators and price data.
-* **Output:** Classification of Buy/Sell/Hold signals.
+- Không train bằng dữ liệu test hoặc chọn ngưỡng sau khi xem test.
+- Feature ngày `t` chỉ dùng thông tin có sẵn đến ngày `t`.
+- Tín hiệu cuối phiên chỉ được khớp sớm nhất ở phiên kế tiếp.
+- Backtest phải tính phí, thuế, trượt giá, thanh khoản, bước giá và lô giao dịch.
+- Cần so sánh benchmark và báo cáo CAGR, Sharpe, Sortino, max drawdown, turnover.
 
-## 🤖 Real-time Automation & Alerts
-
-To bridge the gap between backtesting and live trading, the system integrates a **Real-time Notification Bot** powered by the **FiinQuant** library and the **Telegram Bot API**.
-
-### Key Features
-* **Instant Alerts:** Sends immediate notifications to a private Telegram group whenever a **BUY** or **SELL** signal is triggered.
-* **Comprehensive Trade Details:** Each alert provides actionable data for quick execution:
-    * **Signal Type:** 📈 BUY / 📉 SELL
-    * **Execution Info:** Ticker (Mã), Price (Giá), Volume (Số lượng).
-    * **Rationale:** Explains the trigger reason (e.g., *Trailing Stop*, *Entry Signal*).
-    * **Portfolio Health:** Updates on Expected Risk, Total Capital, and Remaining Cash.
-
-<img width="927" height="618" alt="Bot" src="https://github.com/user-attachments/assets/bdb05e6a-4a51-4004-baaa-7e2b27cac791" />
-
-## 📉 EDA Highlights
-
-
-The project conducted extensive EDA on 3 exchanges to thoroughly understand market behavior:
-* **HOSE:** Lowest volatility, suitable for stable investment strategies.
-* **UPCOM:** Highest volatility and risk, exhibiting strong seasonality.
-* **HNX:** Balanced profile between risk and opportunity.
-
-## ⚙️ Installation
-
-1. **Clone repository:**
-   git clone [https://github.com/phamducuong05/StockBot.git](https://github.com/phamducuong05/StockBot.git)
-   
+Các số liệu 29.35% return và 76.92% win rate trong notebook cũ chỉ là kết quả thử
+nghiệm; cần chạy lại bằng pipeline không leakage trước khi công bố hoặc sử dụng.
